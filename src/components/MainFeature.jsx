@@ -81,7 +81,7 @@ const MainFeature = () => {
     setIsCategoryModalOpen(false);
   };
   
-  const { filter, categoryFilter, categories } = useSelector(state => state.tasks);
+  const { categoryFilter, categories } = useSelector(state => state.tasks);
   const filteredTasks = tasks.filter(task => {
     if (categoryFilter !== 'all' && task.categoryId !== categoryFilter) return false;
     if (filter === 'active') return !task.completed;
@@ -332,11 +332,10 @@ const MainFeature = () => {
                     ))}
                   </select>
                 </div>
-              </div>
               
               <div className="mb-4">
-              <div className="mb-4">
                 <label htmlFor="description" className="block text-sm font-medium mb-1">
+                  Description (Optional)
                   Description (Optional)
                 </label>
                 <textarea
@@ -437,7 +436,6 @@ const MainFeature = () => {
                   ))}
                 </div>
               </>
-            ) : (
               <ul className="space-y-2">
                 <AnimatePresence>
                   {filteredTasks.map(task => (
