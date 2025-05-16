@@ -3,13 +3,17 @@ import { useSelector, useDispatch } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
-import { addTask, toggleTask, deleteTask, setFilter } from '../utils/store';
+import { addTask, toggleTask, deleteTask, setFilter, setCategoryFilter, addCategory, editCategory, deleteCategory } from '../utils/store';
 import { getIcon } from '../utils/iconUtils';
 
 const MainFeature = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('default');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryColor, setNewCategoryColor] = useState('#6366f1');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   
   const inputRef = useRef(null);
@@ -23,6 +27,7 @@ const MainFeature = () => {
   const TrashIcon = getIcon('Trash2');
   const ClockIcon = getIcon('Clock');
   const AlertIcon = getIcon('AlertCircle');
+  const TagIcon = getIcon('Tag');
   
   useEffect(() => {
     if (isExpanded && inputRef.current) {
@@ -38,7 +43,7 @@ const MainFeature = () => {
       return;
     }
     
-    dispatch(addTask({ title: title.trim(), description: description.trim() }));
+    dispatch(addTask({ title: title.trim(), description: description.trim(), categoryId: selectedCategoryId }));
     toast.success('Task added!');
     
     // Reset form
@@ -60,8 +65,25 @@ const MainFeature = () => {
       setSelectedTaskId(null);
     }
   };
+
+  const handleCategorySave = () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Category name cannot be empty!');
+      return;
+    }
+    
+    dispatch(addCategory({ name: newCategoryName.trim(), color: newCategoryColor }));
+    toast.success('Category added!');
+    
+    // Reset form
+    setNewCategoryName('');
+    setNewCategoryColor('#6366f1');
+    setIsCategoryModalOpen(false);
+  };
   
+  const { filter, categoryFilter, categories } = useSelector(state => state.tasks);
   const filteredTasks = tasks.filter(task => {
+    if (categoryFilter !== 'all' && task.categoryId !== categoryFilter) return false;
     if (filter === 'active') return !task.completed;
     if (filter === 'completed') return task.completed;
     return true;
@@ -79,9 +101,136 @@ const MainFeature = () => {
   const selectedTask = selectedTaskId 
     ? tasks.find(task => task.id === selectedTaskId) 
     : null;
+
+  // Array of predefined colors for category selection
+  const colorOptions = [
+    '#6366f1', // primary
+    '#22d3ee', // secondary
+    '#f472b6', // accent
+    '#f97316', // orange
+    '#84cc16', // lime
+    '#14b8a6', // teal
+    '#a855f7', // purple
+    '#ec4899', // pink
+    '#ef4444', // red
+  ];
+
+  // Get category by id
+  const getCategoryById = (categoryId) => {
+    return categories.find(cat => cat.id === categoryId) || { name: 'Unknown', color: '#6366f1' };
+  };
   
   return (
     <div className="card">
+      {/* Categories Management Modal */}
+      <AnimatePresence>
+        {isCategoryModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="bg-white dark:bg-surface-800 rounded-xl p-6 max-w-md w-full"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold">Manage Categories</h3>
+                <button
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-surface-200 dark:hover:bg-surface-700"
+                >
+                  <XIcon size={18} />
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <div className="mb-4">
+                  <label htmlFor="categoryName" className="block text-sm font-medium mb-1">
+                    New Category Name
+                  </label>
+                  <input
+                    type="text"
+                    id="categoryName"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="e.g., Home, Health, Finance"
+                    className="input mb-2"
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Category Color
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {colorOptions.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setNewCategoryColor(color)}
+                        className={`color-swatch ${newCategoryColor === color ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
+                        style={{ backgroundColor: color }}
+                        aria-label={`Select color ${color}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <h4 className="font-medium mb-2">Existing Categories</h4>
+                <ul className="space-y-2 max-h-48 overflow-y-auto">
+                  {categories.map(category => (
+                    <li 
+                      key={category.id}
+                      className="flex items-center justify-between p-2 bg-surface-100 dark:bg-surface-700 rounded-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span 
+                          className="w-4 h-4 rounded-full" 
+                          style={{ backgroundColor: category.color }}
+                        />
+                        <span>{category.name}</span>
+                      </div>
+                      {category.id !== 'default' && (
+                        <button
+                          onClick={() => {
+                            dispatch(deleteCategory(category.id));
+                            toast.success(`Category ${category.name} deleted`);
+                          }}
+                          className="text-surface-400 hover:text-accent"
+                        >
+                          <TrashIcon size={16} />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="btn bg-surface-200 dark:bg-surface-700 hover:bg-surface-300 dark:hover:bg-surface-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCategorySave}
+                  className="btn btn-primary"
+                >
+                  Add Category
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl font-bold">My Tasks</h2>
@@ -90,7 +239,12 @@ const MainFeature = () => {
           </p>
         </div>
         
-        <div className="flex gap-2 self-start md:self-auto">
+        <div className="flex flex-wrap gap-2 self-start md:self-auto">
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-surface-100 dark:bg-surface-700 hover:bg-surface-200 dark:hover:bg-surface-600"
+          >
+            <TagIcon size={16} className="inline mr-1" /> Categories</button>
           <button 
             onClick={() => dispatch(setFilter('all'))} 
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -163,6 +317,24 @@ const MainFeature = () => {
                 />
               </div>
               
+                <label htmlFor="category" className="block text-sm font-medium mb-1">
+                  Category
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    id="category"
+                    value={selectedCategoryId}
+                    onChange={(e) => setSelectedCategoryId(e.target.value)}
+                    className="input flex-grow"
+                  >
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="mb-4">
               <div className="mb-4">
                 <label htmlFor="description" className="block text-sm font-medium mb-1">
                   Description (Optional)
@@ -219,9 +391,52 @@ const MainFeature = () => {
             <h3 className="text-lg font-medium mb-4">Task List</h3>
             
             {filteredTasks.length === 0 ? (
-              <div className="bg-surface-100 dark:bg-surface-800 rounded-lg p-4 text-center">
-                <p className="text-surface-500 dark:text-surface-400">No tasks found</p>
+              <div className="bg-surface-100 dark:bg-surface-800 rounded-lg p-6 text-center">
+                <AlertIcon size={24} className="text-surface-400 mx-auto mb-2" />
+                <p className="text-surface-500 dark:text-surface-400">
+                  {categoryFilter !== 'all' 
+                    ? `No ${filter !== 'all' ? filter : ''} tasks in this category` 
+                    : `No ${filter !== 'all' ? filter : ''} tasks found`}
+                </p>
               </div>
+            ) : (
+              <>
+                {/* Category filter chips */}
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => dispatch(setCategoryFilter('all'))}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      categoryFilter === 'all'
+                        ? 'bg-surface-200 dark:bg-surface-700'
+                        : 'bg-surface-100 dark:bg-surface-800'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {categories.map(category => (
+                    <button
+                      key={category.id}
+                      onClick={() => dispatch(setCategoryFilter(category.id))}
+                      className={`category-badge flex items-center gap-1 ${
+                        categoryFilter === category.id
+                          ? 'ring-2 ring-offset-1 ring-primary'
+                          : ''
+                      }`}
+                      style={{ 
+                        backgroundColor: `${category.color}20`, 
+                        color: category.color,
+                        borderColor: category.color
+                      }}
+                    >
+                      <span 
+                        className="w-2 h-2 rounded-full" 
+                        style={{ backgroundColor: category.color }}
+                      />
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+              </>
             ) : (
               <ul className="space-y-2">
                 <AnimatePresence>
@@ -258,11 +473,19 @@ const MainFeature = () => {
                             selectedTaskId === task.id ? null : task.id
                           )}
                         >
-                          <h4 className={`font-medium ${
-                            task.completed ? 'line-through text-surface-400 dark:text-surface-500' : ''
-                          }`}>
-                            {task.title}
-                          </h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className={`font-medium ${
+                              task.completed ? 'line-through text-surface-400 dark:text-surface-500' : ''
+                            }`}>
+                              {task.title}
+                            </h4>
+                            <span 
+                              className="category-badge"
+                              style={{ backgroundColor: `${getCategoryById(task.categoryId).color}20`, color: getCategoryById(task.categoryId).color }}
+                            >
+                              {getCategoryById(task.categoryId).name}
+                            </span>
+                          </div>
                           
                           {task.description && (
                             <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 line-clamp-1">
@@ -299,7 +522,16 @@ const MainFeature = () => {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-xl font-semibold">{selectedTask.title}</h3>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      <span 
+                        className="category-badge"
+                        style={{ 
+                          backgroundColor: `${getCategoryById(selectedTask.categoryId).color}20`, 
+                          color: getCategoryById(selectedTask.categoryId).color 
+                        }}
+                      >
+                        {getCategoryById(selectedTask.categoryId).name}
+                      </span>
                       <button
                         onClick={() => handleToggleTask(selectedTask.id)}
                         className={`px-3 py-1 rounded-full text-xs font-medium ${

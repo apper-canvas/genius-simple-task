@@ -51,6 +51,14 @@
            bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-primary
            text-surface-800 dark:text-surface-100;
   }
+  
+  .category-badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .color-swatch {
+    @apply w-6 h-6 rounded-full border border-surface-200 dark:border-surface-700 cursor-pointer;
+  }
 }
 
 @layer utilities {
