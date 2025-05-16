@@ -34,8 +34,6 @@ const { tasks: savedTasks, categories: savedCategories } = loadData()
 const taskSlice = createSlice({
   name: 'tasks',
   initialState: {
-        categoryId: action.payload.categoryId || 'default',
-        completed: false,
     tasks: savedTasks,
     categories: savedCategories,
     filter: 'all',
@@ -47,6 +45,7 @@ const taskSlice = createSlice({
         id: Date.now().toString(),
         title: action.payload.title,
         description: action.payload.description || '',
+        categoryId: action.payload.categoryId || 'default',
         completed: false,
         createdAt: format(new Date(), 'yyyy-MM-dd HH:mm:ss')
       }

@@ -18,7 +18,7 @@ const MainFeature = () => {
   
   const inputRef = useRef(null);
   const dispatch = useDispatch();
-  const { tasks, filter } = useSelector(state => state.tasks);
+  const { tasks, filter, categoryFilter, categories } = useSelector(state => state.tasks);
   
   // Get icons
   const PlusIcon = getIcon('Plus');
@@ -81,7 +81,6 @@ const MainFeature = () => {
     setIsCategoryModalOpen(false);
   };
   
-  const { categoryFilter, categories } = useSelector(state => state.tasks);
   const filteredTasks = tasks.filter(task => {
     if (categoryFilter !== 'all' && task.categoryId !== categoryFilter) return false;
     if (filter === 'active') return !task.completed;
@@ -336,7 +335,6 @@ const MainFeature = () => {
               <div className="mb-4">
                 <label htmlFor="description" className="block text-sm font-medium mb-1">
                   Description (Optional)
-                  Description (Optional)
                 </label>
                 <textarea
                   id="description"
@@ -400,110 +398,112 @@ const MainFeature = () => {
               </div>
             ) : (
               <>
-                {/* Category filter chips */}
-                <div className="mb-4 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => dispatch(setCategoryFilter('all'))}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      categoryFilter === 'all'
-                        ? 'bg-surface-200 dark:bg-surface-700'
-                        : 'bg-surface-100 dark:bg-surface-800'
-                    }`}
-                  >
-                    All
-                  </button>
-                  {categories.map(category => (
+                <div>
+                  {/* Category filter chips */}
+                  <div className="mb-4 flex flex-wrap gap-2">
                     <button
-                      key={category.id}
-                      onClick={() => dispatch(setCategoryFilter(category.id))}
-                      className={`category-badge flex items-center gap-1 ${
-                        categoryFilter === category.id
-                          ? 'ring-2 ring-offset-1 ring-primary'
-                          : ''
+                      onClick={() => dispatch(setCategoryFilter('all'))}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        categoryFilter === 'all'
+                          ? 'bg-surface-200 dark:bg-surface-700'
+                          : 'bg-surface-100 dark:bg-surface-800'
                       }`}
-                      style={{ 
-                        backgroundColor: `${category.color}20`, 
-                        color: category.color,
-                        borderColor: category.color
-                      }}
                     >
-                      <span 
-                        className="w-2 h-2 rounded-full" 
-                        style={{ backgroundColor: category.color }}
-                      />
-                      {category.name}
+                      All
                     </button>
-                  ))}
+                    {categories.map(category => (
+                      <button
+                        key={category.id}
+                        onClick={() => dispatch(setCategoryFilter(category.id))}
+                        className={`category-badge flex items-center gap-1 ${
+                          categoryFilter === category.id
+                            ? 'ring-2 ring-offset-1 ring-primary'
+                            : ''
+                        }`}
+                        style={{ 
+                          backgroundColor: `${category.color}20`, 
+                          color: category.color,
+                          borderColor: category.color
+                        }}
+                      >
+                        <span 
+                          className="w-2 h-2 rounded-full" 
+                          style={{ backgroundColor: category.color }}
+                        />
+                        {category.name}
+                      </button>
+                    ))}
+                  </div>
+                  <ul className="space-y-2">
+                    <AnimatePresence>
+                      {filteredTasks.map(task => (
+                        <motion.li 
+                          key={task.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className={`${
+                            selectedTaskId === task.id 
+                              ? 'bg-primary-light/10 dark:bg-primary-dark/20 border-l-4 border-primary' 
+                              : 'bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700'
+                          } rounded-lg p-3 transition-colors`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <button 
+                              onClick={() => handleToggleTask(task.id)}
+                              className={`flex-shrink-0 mt-1 h-5 w-5 rounded-full border ${
+                                task.completed 
+                                  ? 'bg-primary border-primary' 
+                                  : 'border-surface-400 dark:border-surface-600'
+                              }`}
+                            >
+                              {task.completed && (
+                                <CheckIcon size={20} className="text-white" />
+                              )}
+                            </button>
+                            
+                            <div 
+                              className="flex-1 cursor-pointer"
+                              onClick={() => setSelectedTaskId(
+                                selectedTaskId === task.id ? null : task.id
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                <h4 className={`font-medium ${
+                                  task.completed ? 'line-through text-surface-400 dark:text-surface-500' : ''
+                                }`}>
+                                  {task.title}
+                                </h4>
+                                <span 
+                                  className="category-badge"
+                                  style={{ backgroundColor: `${getCategoryById(task.categoryId).color}20`, color: getCategoryById(task.categoryId).color }}
+                                >
+                                  {getCategoryById(task.categoryId).name}
+                                </span>
+                              </div>
+                              
+                              {task.description && (
+                                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 line-clamp-1">
+                                  {task.description}
+                                </p>
+                              )}
+                            </div>
+                            
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="flex-shrink-0 p-1 text-surface-400 hover:text-accent transition-colors"
+                              aria-label="Delete task"
+                            >
+                              <TrashIcon size={16} />
+                            </button>
+                          </div>
+                        </motion.li>
+                      ))}
+                    </AnimatePresence>
+                  </ul>
                 </div>
               </>
-              <ul className="space-y-2">
-                <AnimatePresence>
-                  {filteredTasks.map(task => (
-                    <motion.li 
-                      key={task.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className={`${
-                        selectedTaskId === task.id 
-                          ? 'bg-primary-light/10 dark:bg-primary-dark/20 border-l-4 border-primary' 
-                          : 'bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700'
-                      } rounded-lg p-3 transition-colors`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <button 
-                          onClick={() => handleToggleTask(task.id)}
-                          className={`flex-shrink-0 mt-1 h-5 w-5 rounded-full border ${
-                            task.completed 
-                              ? 'bg-primary border-primary' 
-                              : 'border-surface-400 dark:border-surface-600'
-                          }`}
-                        >
-                          {task.completed && (
-                            <CheckIcon size={20} className="text-white" />
-                          )}
-                        </button>
-                        
-                        <div 
-                          className="flex-1 cursor-pointer"
-                          onClick={() => setSelectedTaskId(
-                            selectedTaskId === task.id ? null : task.id
-                          )}
-                        >
-                          <div className="flex items-center gap-2">
-                            <h4 className={`font-medium ${
-                              task.completed ? 'line-through text-surface-400 dark:text-surface-500' : ''
-                            }`}>
-                              {task.title}
-                            </h4>
-                            <span 
-                              className="category-badge"
-                              style={{ backgroundColor: `${getCategoryById(task.categoryId).color}20`, color: getCategoryById(task.categoryId).color }}
-                            >
-                              {getCategoryById(task.categoryId).name}
-                            </span>
-                          </div>
-                          
-                          {task.description && (
-                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 line-clamp-1">
-                              {task.description}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <button
-                          onClick={() => handleDeleteTask(task.id)}
-                          className="flex-shrink-0 p-1 text-surface-400 hover:text-accent transition-colors"
-                          aria-label="Delete task"
-                        >
-                          <TrashIcon size={16} />
-                        </button>
-                      </div>
-                    </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
             )}
           </div>
           

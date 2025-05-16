@@ -5,5 +5,3 @@ export const getIcon = (iconName) => {
     ? Icons[iconName] 
     : Icons.Smile;
 };
-  Tag,
-  'Tag': Tag,
