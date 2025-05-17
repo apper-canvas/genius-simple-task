@@ -156,9 +156,14 @@ function App() {
       </button>
 
       <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/callback" element={<Callback />} />
+        <Route path="/error" element={<ErrorPage />} />
         <Route path="/" element={<Home />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+
 
       <ToastContainer
         position="bottom-right"
@@ -167,20 +172,13 @@ function App() {
         newestOnTop
         closeOnClick
         rtl={false}
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/callback" element={<Callback />} />
-        <Route path="/error" element={<ErrorPage />} />
-        <Route path="/" element={isAuthenticated ? <Home /> : <Login />} />
-        <Route path="*" element={<NotFound />} />
         pauseOnHover
         theme={darkMode ? "dark" : "light"}
         toastClassName="rounded-xl font-sans text-sm"
       />
-    </div>
+      </div>
+    </AuthContext.Provider>
   );
 }
 
 export default App;
-      </div>
-    </AuthContext.Provider>
