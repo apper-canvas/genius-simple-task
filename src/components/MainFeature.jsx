@@ -3,8 +3,14 @@ import { useSelector, useDispatch } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
-import { addTask, toggleTask, deleteTask, setFilter, setCategoryFilter, addCategory, editCategory, deleteCategory } from '../utils/store';
+import { 
+  setTasks, addTaskSuccess, toggleTaskSuccess, deleteTaskSuccess, 
+  setCategories, addCategorySuccess, deleteCategorySuccess,
+  setFilter, setCategoryFilter, setLoading, setError 
+} from '../store/tasksSlice';
 import { getIcon } from '../utils/iconUtils';
+import { fetchTasks, createTask, toggleTaskCompletion, deleteTask } from '../services/taskService';
+import { fetchCategories, createCategory, deleteCategory } from '../services/categoryService';
 
 const MainFeature = () => {
   const [title, setTitle] = useState('');
@@ -18,7 +24,17 @@ const MainFeature = () => {
   
   const inputRef = useRef(null);
   const dispatch = useDispatch();
-  const { tasks, filter, categoryFilter, categories } = useSelector(state => state.tasks);
+  const { 
+    tasks, 
+    filter, 
+    categoryFilter, 
+    categories, 
+    isLoading, 
+    error 
+  } = useSelector(state => state.tasks);
+  
+  // Get current user from Redux store
+  const { user } = useSelector(state => state.user);
   
   // Get icons
   const PlusIcon = getIcon('Plus');
@@ -35,54 +51,194 @@ const MainFeature = () => {
     }
   }, [isExpanded]);
   
-  const handleSubmit = (e) => {
+  // Load tasks and categories from the database
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        dispatch(setLoading(true));
+        
+        // Fetch all tasks
+        const tasksData = await fetchTasks();
+        dispatch(setTasks(tasksData));
+        
+        // Fetch all categories
+        const categoriesData = await fetchCategories();
+        dispatch(setCategories(categoriesData));
+        
+        dispatch(setLoading(false));
+      } catch (error) {
+        console.error("Error loading data:", error);
+        dispatch(setError(error.message));
+        dispatch(setLoading(false));
+        toast.error("Error loading data. Please try again.");
+      }
+    };
+    
+    loadData();
+  }, [dispatch]);
+  
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!title.trim()) {
       toast.error('Task title cannot be empty!');
       return;
     }
-    
-    dispatch(addTask({ title: title.trim(), description: description.trim(), categoryId: selectedCategoryId }));
-    toast.success('Task added!');
-    
-    // Reset form
-    setTitle('');
-    setDescription('');
-    setIsExpanded(false);
+
+    try {
+      dispatch(setLoading(true));
+      
+      const taskData = {
+        title: title.trim(),
+        description: description.trim(),
+        category: getCategoryById(selectedCategoryId).Name,
+        tags: []
+      };
+      
+      // Create task in the database
+      const newTask = await createTask(taskData);
+      
+      // Update Redux store
+      dispatch(addTaskSuccess(newTask));
+      toast.success('Task added!');
+      
+      // Reset form
+      setTitle('');
+      setDescription('');
+      setIsExpanded(false);
+      
+      dispatch(setLoading(false));
+    } catch (error) {
+      console.error("Error adding task:", error);
+      dispatch(setError(error.message));
+      dispatch(setLoading(false));
+      toast.error("Error adding task. Please try again.");
+    }
   };
   
-  const handleToggleTask = (id) => {
-    dispatch(toggleTask(id));
-    const task = tasks.find(t => t.id === id);
-    toast.info(`Task marked as ${!task.completed ? 'complete' : 'incomplete'}`);
+  const handleToggleTask = async (id) => {
+    try {
+      dispatch(setLoading(true));
+      
+      const task = tasks.find(t => t.Id === id);
+      if (!task) return;
+      
+      // Toggle task completion in the database
+      const updatedTask = await toggleTaskCompletion(id, task.completed);
+      
+      // Update Redux store
+      dispatch(toggleTaskSuccess({ Id: id, completed: !task.completed }));
+      toast.info(`Task marked as ${!task.completed ? 'complete' : 'incomplete'}`);
+      
+      dispatch(setLoading(false));
+    } catch (error) {
+      console.error("Error toggling task:", error);
+      dispatch(setError(error.message));
+      dispatch(setLoading(false));
+      toast.error("Error updating task. Please try again.");
+    }
   };
   
-  const handleDeleteTask = (id) => {
-    dispatch(deleteTask(id));
-    toast.success('Task deleted');
-    if (selectedTaskId === id) {
-      setSelectedTaskId(null);
+  const handleDeleteTask = async (id) => {
+    try {
+      dispatch(setLoading(true));
+      
+      // Delete task from database
+      await deleteTask(id);
+      
+      // Update Redux store
+      dispatch(deleteTaskSuccess(id));
+      toast.success('Task deleted');
+    
+      if (selectedTaskId === id) {
+        setSelectedTaskId(null);
+      }
+      
+      dispatch(setLoading(false));
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      dispatch(setError(error.message));
+      dispatch(setLoading(false));
+      toast.error("Error deleting task. Please try again.");
     }
   };
 
-  const handleCategorySave = () => {
+  const handleCategorySave = async () => {
     if (!newCategoryName.trim()) {
       toast.error('Category name cannot be empty!');
       return;
     }
+
+    try {
+      dispatch(setLoading(true));
+      
+      const categoryData = {
+        name: newCategoryName.trim(),
+        color: newCategoryColor
+      };
+      
+      // Create category in the database
+      const newCategory = await createCategory(categoryData);
+      
+      // Update Redux store
+      dispatch(addCategorySuccess(newCategory));
+      toast.success('Category added!');
+      
+      // Reset form
+      setNewCategoryName('');
+      setNewCategoryColor('#6366f1');
+      setIsCategoryModalOpen(false);
+      
+      dispatch(setLoading(false));
+    } catch (error) {
+      console.error("Error adding category:", error);
+      dispatch(setError(error.message));
+      dispatch(setLoading(false));
+      toast.error("Error adding category. Please try again.");
+    }
+  };
+  
+  const handleDeleteCategoryClick = async (categoryId) => {
+    try {
+      dispatch(setLoading(true));
+      
+      // Don't delete default categories
+      if (categoryId === 'default') {
+        toast.error("Cannot delete the default category");
+        dispatch(setLoading(false));
+        return;
+      }
+      
+      // Delete category from database
+      await deleteCategory(categoryId);
+      
+      // Update Redux store
+      dispatch(deleteCategorySuccess(categoryId));
+      
+      // Also update any tasks using this category to use default
+      const updatedTasks = tasks.map(task => 
+        task.category === getCategoryById(categoryId).Name 
+          ? { ...task, category: 'General' } 
+          : task
+      );
+      
+      dispatch(setTasks(updatedTasks));
+      toast.success('Category deleted');
     
-    dispatch(addCategory({ name: newCategoryName.trim(), color: newCategoryColor }));
-    toast.success('Category added!');
-    
-    // Reset form
-    setNewCategoryName('');
-    setNewCategoryColor('#6366f1');
-    setIsCategoryModalOpen(false);
+      dispatch(setLoading(false));
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      dispatch(setError(error.message));
+      dispatch(setLoading(false));
+      toast.error("Error deleting category. Please try again.");
+    }
   };
   
   const filteredTasks = tasks.filter(task => {
-    if (categoryFilter !== 'all' && task.categoryId !== categoryFilter) return false;
+    if (categoryFilter !== 'all') {
+      const categoryName = getCategoryById(categoryFilter).Name;
+      if (task.category !== categoryName) return false;
+    }
     if (filter === 'active') return !task.completed;
     if (filter === 'completed') return task.completed;
     return true;
@@ -98,8 +254,13 @@ const MainFeature = () => {
   const { total, completed, active } = getTaskCounts();
   
   const selectedTask = selectedTaskId 
-    ? tasks.find(task => task.id === selectedTaskId) 
+    ? tasks.find(task => task.Id === selectedTaskId) 
     : null;
+    
+  // Loading indicator
+  if (isLoading && tasks.length === 0) {
+    return <div className="card p-8 flex items-center justify-center">Loading tasks...</div>;
+  }
 
   // Array of predefined colors for category selection
   const colorOptions = [
@@ -116,8 +277,23 @@ const MainFeature = () => {
 
   // Get category by id
   const getCategoryById = (categoryId) => {
-    return categories.find(cat => cat.id === categoryId) || { name: 'Unknown', color: '#6366f1' };
+    const category = categories.find(cat => cat.Id === categoryId);
+    
+    if (category) {
+      return {
+        Id: category.Id,
+        Name: category.Name,
+        color: category.color
+      };
+    }
+    
+    return { 
+      Id: 'default', 
+      Name: 'General', 
+      color: '#6366f1' 
+    };
   };
+
   
   return (
     <div className="card">
@@ -196,15 +372,13 @@ const MainFeature = () => {
                         <span>{category.name}</span>
                       </div>
                       {category.id !== 'default' && (
-                        <button
+                          style={{ backgroundColor: category.color || '#6366f1' }}
                           onClick={() => {
-                            dispatch(deleteCategory(category.id));
+                        <span>{category.Name || 'Unknown'}</span>
                             toast.success(`Category ${category.name} deleted`);
-                          }}
+                      {category.Id !== 'default' && category.Id !== 'work' && category.Id !== 'personal' && (
                           className="text-surface-400 hover:text-accent"
-                        >
-                          <TrashIcon size={16} />
-                        </button>
+                          onClick={() => handleDeleteCategoryClick(category.Id)
                       )}
                     </li>
                   ))}
@@ -326,9 +500,9 @@ const MainFeature = () => {
                     onChange={(e) => setSelectedCategoryId(e.target.value)}
                     className="input flex-grow"
                   >
-                    {categories.map(category => (
-                      <option key={category.id} value={category.id}>{category.name}</option>
-                    ))}
+                    {categories && categories.map(category => (
+                      <option key={category.Id} value={category.Id}>{category.Name}</option>
+                   ))}
                   </select>
                 </div>
               
@@ -437,22 +611,22 @@ const MainFeature = () => {
                   <ul className="space-y-2">
                     <AnimatePresence>
                       {filteredTasks.map(task => (
-                        <motion.li 
-                          key={task.id}
-                          initial={{ opacity: 0, y: 10 }}
+                       <motion.li 
+                          key={task.Id}
+                         initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.2 }}
                           className={`${
-                            selectedTaskId === task.id 
+                           selectedTaskId === task.Id 
                               ? 'bg-primary-light/10 dark:bg-primary-dark/20 border-l-4 border-primary' 
                               : 'bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700'
                           } rounded-lg p-3 transition-colors`}
                         >
                           <div className="flex items-start gap-3">
                             <button 
-                              onClick={() => handleToggleTask(task.id)}
-                              className={`flex-shrink-0 mt-1 h-5 w-5 rounded-full border ${
+                              onClick={() => handleToggleTask(task.Id)}
+                                selectedTaskId === task.Id ? null : task.Id
                                 task.completed 
                                   ? 'bg-primary border-primary' 
                                   : 'border-surface-400 dark:border-surface-600'
@@ -460,13 +634,13 @@ const MainFeature = () => {
                             >
                               {task.completed && (
                                 <CheckIcon size={20} className="text-white" />
-                              )}
+                                  {task.title || task.Name}
                             </button>
-                            
+                               <span 
                             <div 
-                              className="flex-1 cursor-pointer"
+                                  style={{ backgroundColor: '#6366f120', color: '#6366f1' }}
                               onClick={() => setSelectedTaskId(
-                                selectedTaskId === task.id ? null : task.id
+                                  {task.category || 'General'}
                               )}
                             >
                               <div className="flex items-center gap-2">
@@ -476,7 +650,7 @@ const MainFeature = () => {
                                   {task.title}
                                 </h4>
                                 <span 
-                                  className="category-badge"
+                              onClick={() => handleDeleteTask(task.Id)}
                                   style={{ backgroundColor: `${getCategoryById(task.categoryId).color}20`, color: getCategoryById(task.categoryId).color }}
                                 >
                                   {getCategoryById(task.categoryId).name}
@@ -523,15 +697,15 @@ const MainFeature = () => {
                     <div className="flex items-center gap-2">
                       <span 
                         className="category-badge"
-                        style={{ 
-                          backgroundColor: `${getCategoryById(selectedTask.categoryId).color}20`, 
-                          color: getCategoryById(selectedTask.categoryId).color 
+                       style={{ 
+                          backgroundColor: '#6366f120', 
+                          color: '#6366f1' 
                         }}
                       >
-                        {getCategoryById(selectedTask.categoryId).name}
+                        {selectedTask.category || 'General'}
                       </span>
                       <button
-                        onClick={() => handleToggleTask(selectedTask.id)}
+                        onClick={() => handleToggleTask(selectedTask.Id)}
                         className={`px-3 py-1 rounded-full text-xs font-medium ${
                           selectedTask.completed
                             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
@@ -546,7 +720,7 @@ const MainFeature = () => {
                   <div className="mb-6">
                     <div className="flex items-center text-sm text-surface-500 dark:text-surface-400 mb-4">
                       <ClockIcon size={14} className="mr-1" />
-                      <span>Created: {format(new Date(selectedTask.createdAt), 'PP')}</span>
+                      <span>Created: {selectedTask.CreatedOn ? format(new Date(selectedTask.CreatedOn), 'PP') : 'Unknown'}</span>
                     </div>
                     
                     <div className="bg-surface-50 dark:bg-surface-900 rounded-lg p-4 min-h-[100px]">
@@ -567,7 +741,7 @@ const MainFeature = () => {
                     </button>
                     
                     <button
-                      onClick={() => handleDeleteTask(selectedTask.id)}
+                      onClick={() => handleDeleteTask(selectedTask.Id)}
                       className="btn bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
                     >
                       <TrashIcon size={16} className="mr-1" />

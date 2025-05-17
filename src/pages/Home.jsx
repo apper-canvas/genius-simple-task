@@ -1,12 +1,37 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useContext } from 'react';
+import { AuthContext } from '../App';
 import { getIcon } from '../utils/iconUtils';
 import MainFeature from '../components/MainFeature';
 
 const Home = () => {
   const [loaded, setLoaded] = useState(false);
+  const navigate = useNavigate();
+  const { isAuthenticated, logout } = useContext(AuthContext);
   
+  // Check authentication
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
+  if (!isAuthenticated) {
+    return null; // Don't render anything if not authenticated
+  }
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   useEffect(() => {
     setLoaded(true);
   }, []);
@@ -36,6 +61,18 @@ const Home = () => {
 
   return (
     <div className="min-h-screen">
+      {/* Logout Button */}
+      <button
+        onClick={handleLogout}
+        className="fixed top-4 right-16 z-50 p-2 rounded-full bg-surface-200 dark:bg-surface-700 text-surface-800 dark:text-surface-100 transition-all hover:bg-surface-300 dark:hover:bg-surface-600"
+        aria-label="Logout"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </button>
       <header className="container mx-auto px-4 py-6 md:py-8 lg:py-10">
         <motion.div 
           className="flex flex-col items-center text-center"
